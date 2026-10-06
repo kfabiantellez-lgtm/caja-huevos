@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caja Huevos</title>
+<meta name="theme-color" content="#b45309">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icono-192.png">
+<link rel="apple-touch-icon" href="icono-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root {
+  --fondo: #faf7f2; --tarjeta: #ffffff; --texto: #1f1a14; --suave: #6b6158;
+  --borde: #e6ded3; --marca: #b45309; --marca-texto: #ffffff; --marca-suave: #fdf0e1;
+  --ok: #15803d; --ok-suave: #e8f6ec; --mal: #b91c1c; --mal-suave: #fdecec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #17140f; --tarjeta: #221e18; --texto: #f3eee7; --suave: #a89d90;
+    --borde: #3a332a; --marca: #f59e0b; --marca-texto: #1f1a14; --marca-suave: #3a2a12;
+    --ok: #4ade80; --ok-suave: #15301e; --mal: #f87171; --mal-suave: #3a1717;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--fondo); color: var(--texto);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom));
+}
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--fondo);
+  padding: 12px 16px 8px; border-bottom: 1px solid var(--borde);
+}
+header h1 { margin: 0; font-size: 18px; }
+header small { color: var(--suave); }
+main { padding: 12px 16px; max-width: 640px; margin: 0 auto; }
+section[hidden] { display: none; }
+h2 { font-size: 17px; margin: 18px 0 8px; }
+button, input, select { font: inherit; color: inherit; }
+button {
+  border: 1px solid var(--borde); background: var(--tarjeta); border-radius: 10px;
+  padding: 10px 12px; cursor: pointer; min-height: 44px;
+}
+button.primario { background: var(--marca); color: var(--marca-texto); border-color: var(--marca); font-weight: 600; }
+button.peligro { color: var(--mal); }
+button:disabled { opacity: .45; }
+input, select {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px;
+  background: var(--tarjeta); min-height: 44px;
+}
+label { display: block; font-size: 14px; color: var(--suave); margin: 10px 0 4px; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+.chips button { white-space: nowrap; border-radius: 999px; min-height: 38px; padding: 6px 14px; }
+.chips button.activo { background: var(--marca); color: var(--marca-texto); border-color: var(--marca); }
+
+.producto { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.producto b { display: block; margin-bottom: 8px; }
+.producto b small { font-weight: 400; color: var(--suave); margin-left: 6px; }
+.negativo { color: var(--mal) !important; }
+
+.fila-inv { display: flex; width: 100%; text-align: left; gap: 8px; margin: 6px 0; align-items: flex-start; }
+.fila-inv .que { flex: 1; min-width: 0; }
+.fila-inv .que small { display: block; color: var(--suave); font-size: 13px; }
+.fila-inv b { white-space: nowrap; }
+.casillas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.casillas label { margin: 0 0 2px; }
+.motivos { grid-template-columns: 1fr 1fr; margin-top: 4px; }
+.presentaciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.presentaciones button { text-align: left; line-height: 1.2; }
+.presentaciones button span { display: block; font-size: 13px; color: var(--suave); }
+.presentaciones button:active { background: var(--marca-suave); }
+
+.barra-carrito {
+  position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 6;
+  padding: 8px 16px; background: var(--fondo); border-top: 1px solid var(--borde);
+}
+.barra-carrito button { width: 100%; display: flex; justify-content: space-between; max-width: 608px; margin: 0 auto; }
+
+nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; display: flex;
+  background: var(--tarjeta); border-top: 1px solid var(--borde);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav button { flex: 1; border: 0; border-radius: 0; background: transparent; min-height: 64px; color: var(--suave); }
+nav button.activo { color: var(--marca); font-weight: 700; }
+
+.hoja {
+  position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.hoja[hidden] { display: none; }
+.hoja > div {
+  background: var(--fondo); width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto;
+  border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+.linea { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--borde); }
+.linea .que { flex: 1; min-width: 0; }
+.linea .que small { display: block; color: var(--suave); }
+.linea .cant { display: flex; align-items: center; gap: 4px; }
+.linea .cant button { min-width: 40px; padding: 6px; }
+.linea .cant input { width: 54px; text-align: center; padding: 6px; }
+.precio-editable { border: 0; background: none; padding: 0; min-height: 0; color: var(--marca); text-decoration: underline dotted; }
+
+.medios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.medios button.activo, .billetes button.activo { background: var(--marca); color: var(--marca-texto); border-color: var(--marca); }
+.billetes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.billetes button { padding: 6px; font-size: 14px; }
+
+.total { display: flex; justify-content: space-between; font-size: 22px; font-weight: 700; margin: 12px 0; }
+.aviso { padding: 10px 12px; border-radius: 10px; margin: 10px 0; }
+.aviso.ok { background: var(--ok-suave); color: var(--ok); }
+.aviso.mal { background: var(--mal-suave); color: var(--mal); }
+.fila-botones { display: flex; gap: 8px; margin-top: 12px; }
+.fila-botones button { flex: 1; }
+
+.tarjetas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; }
+.tarjeta small { color: var(--suave); display: block; }
+.tarjeta b { font-size: 18px; }
+.tarjeta.ancha { grid-column: 1 / -1; }
+.tarjeta.destacada { border-color: var(--marca); background: var(--marca-suave); }
+
+.venta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.venta.anulada { opacity: .55; }
+.venta.anulada .monto { text-decoration: line-through; }
+.venta header, .venta .cab { position: static; display: flex; justify-content: space-between; padding: 0; border: 0; background: none; }
+.venta ul { margin: 6px 0; padding-left: 18px; color: var(--suave); font-size: 14px; }
+.vacio { color: var(--suave); text-align: center; padding: 24px 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td { padding: 6px 0; border-bottom: 1px solid var(--borde); }
+td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
+.toast {
+  position: fixed; left: 16px; right: 16px; top: 16px; z-index: 30; text-align: center;
+  background: var(--ok); color: #fff; padding: 12px; border-radius: 12px; font-weight: 600;
+}
+.toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Caja · Tienda de huevos</h1>
+  <small id="subtitulo"></small>
+</header>
+<div id="error-guardado" class="aviso mal" hidden style="margin:8px 16px">
+  Este navegador no deja guardar. Las ventas NO quedarían anotadas. Abra la app
+  desde el ícono instalado o desde Chrome / Safari normal (no en modo incógnito).
+</div>
+
+<main>
+  <!-- VENDER -->
+  <section id="vista-vender">
+    <div class="chips" id="categorias"></div>
+    <div id="productos"></div>
+  </section>
+
+  <!-- EL DIA: ventas y gastos -->
+  <section id="vista-dia" hidden>
+    <label for="fecha-dia">Día</label>
+    <input type="date" id="fecha-dia">
+    <h2>Gastos que salieron de la caja</h2>
+    <div class="fila-botones" style="margin-top:0">
+      <input id="gasto-concepto" placeholder="Concepto (ej. bolsas)" style="flex:2">
+      <input id="gasto-valor" inputmode="numeric" placeholder="Valor" style="flex:1">
+    </div>
+    <div class="fila-botones"><button id="agregar-gasto">Agregar gasto</button></div>
+    <div id="lista-gastos"></div>
+    <h2>Ventas</h2>
+    <div id="lista-ventas"></div>
+  </section>
+
+  <!-- INVENTARIO -->
+  <section id="vista-inventario" hidden>
+    <div class="fila-botones" style="margin-top:0">
+      <button class="primario" data-nuevo="entrada">Llegó</button>
+      <button data-nuevo="salida">Salida</button>
+      <button data-nuevo="conteo">Contar</button>
+    </div>
+    <label for="fecha-inv">Día del informe</label>
+    <input type="date" id="fecha-inv">
+    <div id="lista-inv"></div>
+    <div class="fila-botones">
+      <button class="primario" id="compartir-inv">Enviar inventario por WhatsApp</button>
+    </div>
+    <h2>Movimientos de ese día</h2>
+    <div id="movs-dia"></div>
+  </section>
+
+  <!-- CIERRE -->
+  <section id="vista-cierre" hidden>
+    <label for="fecha-cierre">Día</label>
+    <input type="date" id="fecha-cierre">
+    <label for="base">Base: efectivo que había en el cajón al abrir</label>
+    <input id="base" inputmode="numeric" placeholder="0">
+    <div id="resumen" style="margin-top:12px"></div>
+    <label for="contado">Efectivo contado en el cajón</label>
+    <input id="contado" inputmode="numeric" placeholder="Cuente y escriba aquí">
+    <div id="diferencia"></div>
+    <div class="fila-botones">
+      <button class="primario" id="compartir">Enviar cierre e inventario</button>
+      <button id="descargar-csv">Excel del día</button>
+    </div>
+    <h2>Vendido por producto</h2>
+    <div id="por-producto"></div>
+    <h2>Respaldo</h2>
+    <p style="color:var(--suave);font-size:14px;margin:0">
+      Todo queda guardado solo en este celular. Descargue un respaldo de vez en
+      cuando: si el celular se pierde o se borra el navegador, con ese archivo se recupera.
+    </p>
+    <div id="aviso-respaldo"></div>
+    <div class="fila-botones">
+      <button id="descargar-respaldo">Descargar respaldo</button>
+      <button id="cargar-respaldo">Restaurar respaldo</button>
+    </div>
+    <input type="file" id="archivo-respaldo" accept="application/json,.json" hidden>
+    <p style="color:var(--suave);font-size:13px" id="info-catalogo"></p>
+  </section>
+</main>
+
+<div class="barra-carrito" id="barra-carrito" hidden>
+  <button class="primario" id="abrir-carrito"><span id="barra-cant"></span><span id="barra-total"></span></button>
+</div>
+
+<nav>
+  <button data-vista="vender" class="activo">Vender</button>
+  <button data-vista="dia">El día</button>
+  <button data-vista="inventario">Inventario</button>
+  <button data-vista="cierre">Cierre</button>
+</nav>
+
+<!-- MOVIMIENTO DE INVENTARIO -->
+<div class="hoja" id="hoja-mov" hidden>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Inventario</h2>
+      <button id="cerrar-mov">Cerrar</button>
+    </div>
+    <div class="medios" id="tipos-mov" style="margin-top:12px"></div>
+    <label for="producto-mov">Producto</label>
+    <select id="producto-mov"></select>
+    <div id="stock-mov" style="color:var(--suave);font-size:14px;margin-top:6px"></div>
+    <label id="titulo-casillas"></label>
+    <div class="casillas" id="casillas-mov"></div>
+    <div id="zona-motivo">
+      <label>Motivo</label>
+      <div class="medios motivos" id="motivos"></div>
+    </div>
+    <div id="vista-previa-mov"></div>
+    <div class="fila-botones">
+      <button class="primario" id="guardar-mov" style="flex:2">Guardar</button>
+      <button id="guardar-siguiente">Guardar y siguiente</button>
+    </div>
+  </div>
+</div>
+
+<!-- COBRAR -->
+<div class="hoja" id="hoja-carrito" hidden>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Venta</h2>
+      <button id="cerrar-carrito">Seguir eligiendo</button>
+    </div>
+    <div id="lineas-carrito"></div>
+    <div class="total"><span>Total</span><span id="total-carrito"></span></div>
+    <div class="medios" id="medios"></div>
+    <div id="zona-efectivo">
+      <label for="recibido">Recibido en efectivo</label>
+      <input id="recibido" inputmode="numeric" placeholder="Toque un billete o escriba">
+      <div class="billetes" id="billetes"></div>
+      <div id="vueltas"></div>
+    </div>
+    <div class="fila-botones">
+      <button class="peligro" id="vaciar">Vaciar</button>
+      <button class="primario" id="registrar" style="flex:2">Registrar venta</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="logica.js"></script>
+<script src="catalogo.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.Logica;
+  var CLAVE = "pos-movil-v1";
+
+  // ---------------------------------------------------------------- datos
+  // Todo lo del negocio vive en un solo objeto que se guarda entero despues
+  // de cada cambio. Son pocas ventas por dia, asi que guardarlo todo cada vez
+  // es rapido y evita que quede guardada la mitad de algo.
+  var datos = L.normalizar({ app: "pos-movil", ventas: [], gastos: [], bases: {}, siguienteNum: 1 });
+  var sePuedeGuardar = true;
+
+  function cargar() {
+    try {
+      var texto = localStorage.getItem(CLAVE);
+      if (texto) {
+        var leido = JSON.parse(texto);
+        if (L.respaldoValido(leido)) datos = L.normalizar(leido);
+      }
+      localStorage.setItem(CLAVE + "-prueba", "1");
+      localStorage.removeItem(CLAVE + "-prueba");
+    } catch (e) {
+      sePuedeGuardar = false;
+    }
+    document.getElementById("error-guardado").hidden = sePuedeGuardar;
+    // Pide que el navegador no borre estos datos para liberar espacio.
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  }
+
+  function guardar() {
+    try {
+      localStorage.setItem(CLAVE, JSON.stringify(datos));
+      return true;
+    } catch (e) {
+      sePuedeGuardar = false;
+      document.getElementById("error-guardado").hidden = false;
+      return false;
+    }
+  }
+
+  function ahoraTexto() {
+    var d = new Date();
+    return L.fechaLocal(d) + " " + L.horaLocal(d) + ":" + String(d.getSeconds()).padStart(2, "0");
+  }
+
+  function hoy() { return L.fechaLocal(new Date()); }
+
+  function numero(texto) {
+    var limpio = String(texto || "").replace(/[^\d]/g, "");
+    return limpio ? parseInt(limpio, 10) : 0;
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(t) {
+    return String(t).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function aviso(texto) {
+    var t = $("toast");
+    t.textContent = texto;
+    t.hidden = false;
+    clearTimeout(aviso.temporizador);
+    aviso.temporizador = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  // ---------------------------------------------------------------- vender
+  var categorias = [];
+  CATALOGO.productos.forEach(function (p) {
+    if (categorias.indexOf(p.cat) < 0) categorias.push(p.cat);
+  });
+  var categoriaActiva = categorias[0];
+  var carrito = [];
+  var medio = "Efectivo";
+
+  function pintarCategorias() {
+    $("categorias").innerHTML = categorias.map(function (c) {
+      return '<button data-cat="' + esc(c) + '"' + (c === categoriaActiva ? ' class="activo"' : "") + ">" +
+        esc(c.charAt(0) + c.slice(1).toLowerCase()) + "</button>";
+    }).join("");
+  }
+
+  function pintarProductos() {
+    var inv = L.inventarioDia(datos, hoy());
+    $("productos").innerHTML = CATALOGO.productos.filter(function (p) {
+      return p.cat === categoriaActiva && L.presVenta(p).length;
+    }).map(function (p) {
+      // El stock solo se muestra si ya se conto o se movio algo: un "0" en
+      // un producto que nunca se ha contado haria creer que no hay.
+      var r = inv[p.cod];
+      var stock = r ? "<small" + (r.final < 0 ? ' class="negativo"' : "") + ">quedan " +
+        esc(L.textoConteo(p, r.final)) + "</small>" : "";
+      return '<div class="producto"><b>' + esc(p.nombre) + stock + '</b><div class="presentaciones">' +
+        p.pres.map(function (pr, i) {
+          if (!pr.venta) return "";
+          return '<button data-cod="' + esc(p.cod) + '" data-i="' + i + '">' + esc(pr.nombre) +
+            "<span>" + L.pesos(pr.precio) + "</span></button>";
+        }).join("") + "</div></div>";
+    }).join("");
+  }
+
+  function buscarProducto(cod) {
+    for (var i = 0; i < CATALOGO.productos.length; i++) {
+      if (CATALOGO.productos[i].cod === cod) return CATALOGO.productos[i];
+    }
+    return null;
+  }
+
+  function pintarBarra() {
+    var unidades = carrito.reduce(function (s, l) { return s + l.cant; }, 0);
+    $("barra-carrito").hidden = carrito.length === 0;
+    $("barra-cant").textContent = unidades + (unidades === 1 ? " artículo · Cobrar" : " artículos · Cobrar");
+    $("barra-total").textContent = L.pesos(L.totalCarrito(carrito));
+  }
+
+  function pintarCarrito() {
+    if (!carrito.length) { cerrarCarrito(); pintarBarra(); return; }
+    $("lineas-carrito").innerHTML = carrito.map(function (l, i) {
+      return '<div class="linea"><div class="que">' + esc(l.nombre) + "<small>" + esc(l.pres) +
+        ' · <button class="precio-editable" data-precio="' + i + '">' + L.pesos(l.precio) + "</button> c/u · " +
+        L.pesos(l.cant * l.precio) + '</small></div><div class="cant">' +
+        '<button data-menos="' + i + '">−</button>' +
+        '<input data-cant="' + i + '" inputmode="numeric" value="' + l.cant + '">' +
+        '<button data-mas="' + i + '">+</button></div></div>';
+    }).join("");
+    $("total-carrito").textContent = L.pesos(L.totalCarrito(carrito));
+    $("medios").innerHTML = L.MEDIOS_PAGO.map(function (m) {
+      return '<button data-medio="' + m + '"' + (m === medio ? ' class="activo"' : "") + ">" + m + "</button>";
+    }).join("");
+    $("zona-efectivo").hidden = medio !== "Efectivo";
+    $("billetes").innerHTML = '<button data-billete="exacto">Exacto</button>' +
+      L.BILLETES.map(function (b) {
+        return '<button data-billete="' + b + '">' + L.pesos(b) + "</button>";
+      }).join("");
+    pintarVueltas();
+    pintarBarra();
+  }
+
+  function pintarVueltas() {
+    var total = L.totalCarrito(carrito);
+    var recibido = numero($("recibido").value);
+    var caja = $("vueltas");
+    if (medio !== "Efectivo" || !recibido) { caja.innerHTML = ""; return; }
+    var c = L.cambio(total, recibido);
+    caja.innerHTML = c === null
+      ? '<div class="aviso mal">Faltan ' + L.pesos(total - recibido) + "</div>"
+      : '<div class="aviso ok" style="font-size:20px"><b>Vueltas: ' + L.pesos(c) + "</b></div>";
+  }
+
+  function abrirCarrito() { $("hoja-carrito").hidden = false; pintarCarrito(); }
+  function cerrarCarrito() { $("hoja-carrito").hidden = true; }
+
+  function registrarVenta() {
+    if (!carrito.length) return;
+    var total = L.totalCarrito(carrito);
+    var recibido = numero($("recibido").value);
+    if (medio === "Efectivo" && recibido && L.cambio(total, recibido) === null) {
+      aviso("Lo recibido no alcanza para el total");
+      return;
+    }
+    var venta = {
+      num: datos.siguienteNum,
+      sec: L.siguienteSec(datos),
+      fecha: ahoraTexto(),
+      items: carrito,
+      total: total,
+      medio: medio,
+      recibido: medio === "Efectivo" ? (recibido || total) : total,
+      anulada: false
+    };
+    datos.ventas.push(venta);
+    datos.siguienteNum++;
+    if (!guardar()) {
+      // Si no quedo guardada, no se finge que si: se deshace y se dice.
+      datos.ventas.pop();
+      datos.siguienteNum--;
+      datos.siguienteSec--;
+      alert("No se pudo guardar la venta en el celular. No quedó registrada.");
+      return;
+    }
+    var vueltas = venta.recibido - total;
+    carrito = [];
+    medio = "Efectivo";
+    $("recibido").value = "";
+    cerrarCarrito();
+    pintarBarra();
+    pintarProductos();
+    aviso("Venta #" + venta.num + " registrada" + (vueltas > 0 ? " · vueltas " + L.pesos(vueltas) : ""));
+  }
+
+  $("categorias").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    categoriaActiva = b.dataset.cat;
+    pintarCategorias();
+    pintarProductos();
+  });
+
+  $("productos").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var p = buscarProducto(b.dataset.cod);
+    var pr = p.pres[+b.dataset.i];
+    L.agregarAlCarrito(carrito, { cod: p.cod, nombre: p.nombre, pres: pr.nombre, u: pr.u, cant: 1, precio: pr.precio });
+    pintarBarra();
+    if (navigator.vibrate) navigator.vibrate(15);
+  });
+
+  $("abrir-carrito").addEventListener("click", abrirCarrito);
+  $("cerrar-carrito").addEventListener("click", cerrarCarrito);
+  $("hoja-carrito").addEventListener("click", function (e) {
+    if (e.target === $("hoja-carrito")) cerrarCarrito();
+  });
+
+  $("lineas-carrito").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.mas !== undefined) carrito[+b.dataset.mas].cant++;
+    if (b.dataset.menos !== undefined) {
+      var i = +b.dataset.menos;
+      if (--carrito[i].cant <= 0) carrito.splice(i, 1);
+    }
+    if (b.dataset.precio !== undefined) {
+      var linea = carrito[+b.dataset.precio];
+      var nuevo = prompt("Precio por unidad de " + linea.nombre + " (" + linea.pres + ")", linea.precio);
+      if (nuevo !== null && numero(nuevo) > 0) linea.precio = numero(nuevo);
+    }
+    pintarCarrito();
+  });
+
+  $("lineas-carrito").addEventListener("change", function (e) {
+    if (e.target.dataset.cant === undefined) return;
+    var i = +e.target.dataset.cant;
+    var n = numero(e.target.value);
+    if (n > 0) carrito[i].cant = n; else carrito.splice(i, 1);
+    pintarCarrito();
+  });
+
+  $("medios").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    medio = b.dataset.medio;
+    pintarCarrito();
+  });
+
+  $("billetes").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var total = L.totalCarrito(carrito);
+    $("recibido").value = b.dataset.billete === "exacto" ? total : b.dataset.billete;
+    pintarVueltas();
+  });
+
+  $("recibido").addEventListener("input", pintarVueltas);
+  $("registrar").addEventListener("click", registrarVenta);
+  $("vaciar").addEventListener("click", function () {
+    if (confirm("¿Vaciar la venta?")) { carrito = []; pintarCarrito(); }
+  });
+
+  // ---------------------------------------------------------------- el dia
+  function pintarDia() {
+    var fecha = $("fecha-dia").value || hoy();
+    var gastos = datos.gastos.filter(function (g) { return g.fecha.slice(0, 10) === fecha; });
+    $("lista-gastos").innerHTML = gastos.length ? gastos.map(function (g) {
+      return '<div class="venta' + (g.anulado ? " anulada" : "") + '"><div class="cab"><span>' +
+        esc(g.concepto) + ' <small style="color:var(--suave)">' + g.fecha.slice(11, 16) + "</small></span>" +
+        '<b class="monto">' + L.pesos(g.valor) + "</b></div>" +
+        (g.anulado ? "<small>Anulado</small>" :
+          '<button class="peligro" data-anular-gasto="' + g.id + '">Anular gasto</button>') + "</div>";
+    }).join("") : '<div class="vacio">Sin gastos este día</div>';
+
+    var ventas = datos.ventas.filter(function (v) { return v.fecha.slice(0, 10) === fecha; }).reverse();
+    $("lista-ventas").innerHTML = ventas.length ? ventas.map(function (v) {
+      return '<div class="venta' + (v.anulada ? " anulada" : "") + '"><div class="cab"><span>#' + v.num +
+        " · " + v.fecha.slice(11, 16) + " · " + v.medio + '</span><b class="monto">' + L.pesos(v.total) +
+        "</b></div><ul>" + v.items.map(function (it) {
+          return "<li>" + it.cant + " × " + esc(it.nombre) + " (" + esc(it.pres) + ") " + L.pesos(it.cant * it.precio) + "</li>";
+        }).join("") + "</ul>" +
+        (v.anulada ? "<small>Anulada" + (v.motivo ? ": " + esc(v.motivo) : "") + "</small>" :
+          '<button class="peligro" data-anular-venta="' + v.num + '">Anular venta</button>') + "</div>";
+    }).join("") : '<div class="vacio">Sin ventas este día</div>';
+  }
+
+  // Anular no borra: la venta queda tachada y deja de sumar, igual que en el
+  // programa de escritorio. Asi el cuaderno digital no tiene hojas arrancadas.
+  $("lista-ventas").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-anular-venta]");
+    if (!b) return;
+    var num = +b.dataset.anularVenta;
+    var motivo = prompt("¿Por qué se anula la venta #" + num + "?");
+    if (motivo === null) return;
+    datos.ventas.forEach(function (v) {
+      if (v.num === num) { v.anulada = true; v.motivo = motivo; }
+    });
+    guardar();
+    pintarDia();
+    pintarProductos();
+  });
+
+  $("lista-gastos").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-anular-gasto]");
+    if (!b || !confirm("¿Anular este gasto?")) return;
+    datos.gastos.forEach(function (g) { if (g.id === +b.dataset.anularGasto) g.anulado = true; });
+    guardar();
+    pintarDia();
+  });
+
+  $("agregar-gasto").addEventListener("click", function () {
+    var concepto = $("gasto-concepto").value.trim();
+    var valor = numero($("gasto-valor").value);
+    if (!concepto || !valor) { aviso("Escriba el concepto y el valor"); return; }
+    var fecha = $("fecha-dia").value || hoy();
+    // Un gasto anotado para otro dia (porque se olvido) va a ese dia.
+    var cuando = fecha === hoy() ? ahoraTexto() : fecha + " 12:00:00";
+    var id = datos.gastos.reduce(function (m, g) { return Math.max(m, g.id); }, 0) + 1;
+    datos.gastos.push({ id: id, fecha: cuando, concepto: concepto, valor: valor, anulado: false });
+    if (!guardar()) { datos.gastos.pop(); alert("No se pudo guardar el gasto."); return; }
+    $("gasto-concepto").value = "";
+    $("gasto-valor").value = "";
+    pintarDia();
+  });
+
+  $("fecha-dia").addEventListener("change", pintarDia);
+
+  // ---------------------------------------------------------------- inventario
+  var TIPOS_MOV = { entrada: "Llegó", salida: "Salida", conteo: "Conteo" };
+  var tipoMov = "entrada";
+  var motivoMov = L.MOTIVOS_SALIDA[0];
+
+  function pintarInventario() {
+    var fecha = $("fecha-inv").value || hoy();
+    var inv = L.inventarioDia(datos, fecha);
+    var html = "";
+    var catActual = null;
+    CATALOGO.productos.forEach(function (p) {
+      if (p.cat !== catActual) {
+        catActual = p.cat;
+        html += "<h2>" + esc(p.cat.charAt(0) + p.cat.slice(1).toLowerCase()) + "</h2>";
+      }
+      var r = inv[p.cod];
+      var t = function (n) { return L.textoConteo(p, n); };
+      var detalle = [];
+      if (r && r.vendido) detalle.push("vendido " + t(r.vendido));
+      if (r && r.entro) detalle.push("entró " + t(r.entro));
+      if (r && r.salio) detalle.push("salió " + t(r.salio));
+      if (r && r.ajuste) detalle.push("ajuste " + (r.ajuste > 0 ? "+" : "") + t(r.ajuste));
+      html += '<button class="fila-inv" data-cod="' + esc(p.cod) + '"><span class="que">' + esc(p.nombre) +
+        "<small>" + (r ? (detalle.join(" · ") || "sin movimiento ese día") : "sin contar todavía") +
+        "</small></span><b" + (r && r.final < 0 ? ' class="negativo"' : "") + ">" +
+        (r ? esc(t(r.final)) : "—") + "</b></button>";
+    });
+    $("lista-inv").innerHTML = html;
+
+    var movs = datos.movimientos.filter(function (m) { return m.fecha.slice(0, 10) === fecha; }).reverse();
+    $("movs-dia").innerHTML = movs.length ? movs.map(function (m) {
+      var p = buscarProducto(m.cod);
+      var que = p ? p.nombre : m.cod;
+      var cant = p ? L.textoConteo(p, m.unidades) : m.unidades + " u";
+      return '<div class="venta' + (m.anulado ? " anulada" : "") + '"><div class="cab"><span>' +
+        TIPOS_MOV[m.tipo] + " · " + esc(que) + ' <small style="color:var(--suave)">' + m.fecha.slice(11, 16) +
+        (m.motivo ? " · " + esc(m.motivo) : "") + '</small></span><b class="monto">' + esc(cant) + "</b></div>" +
+        (m.anulado ? "<small>Anulado</small>" :
+          '<button class="peligro" data-anular-mov="' + m.id + '">Anular</button>') + "</div>";
+    }).join("") : '<div class="vacio">Nada registrado ese día</div>';
+  }
+
+  function abrirMovimiento(tipo, cod) {
+    if (tipo) tipoMov = tipo;
+    $("producto-mov").innerHTML = CATALOGO.productos.map(function (p) {
+      return '<option value="' + esc(p.cod) + '">' + esc(p.nombre) + "</option>";
+    }).join("");
+    if (cod) $("producto-mov").value = cod;
+    $("hoja-mov").hidden = false;
+    pintarMovimiento(true);
+  }
+
+  function productoMov() { return buscarProducto($("producto-mov").value); }
+
+  function casillasMov() {
+    var casillas = {};
+    document.querySelectorAll("#casillas-mov input").forEach(function (inp) {
+      casillas[inp.dataset.pres] = numero(inp.value);
+    });
+    return casillas;
+  }
+
+  // limpiar: al cambiar de producto las casillas son otras, asi que se
+  // vuelven a armar vacias. Al escribir solo se actualiza la vista previa.
+  function pintarMovimiento(limpiar) {
+    var p = productoMov();
+    var inv = L.inventarioDia(datos, hoy());
+    var actual = inv[p.cod] ? inv[p.cod].final : 0;
+    $("tipos-mov").innerHTML = Object.keys(TIPOS_MOV).map(function (t) {
+      return '<button data-tipo="' + t + '"' + (t === tipoMov ? ' class="activo"' : "") + ">" + TIPOS_MOV[t] + "</button>";
+    }).join("");
+    $("stock-mov").textContent = inv[p.cod]
+      ? "Según el celular hay " + L.textoConteo(p, actual) : "Este producto no se ha contado todavía.";
+    $("titulo-casillas").textContent = tipoMov === "conteo" ? "¿Cuánto hay de verdad?"
+      : tipoMov === "entrada" ? "¿Cuánto llegó?" : "¿Cuánto salió?";
+    if (limpiar) {
+      $("casillas-mov").innerHTML = L.presCantidad(p).map(function (pr) {
+        return "<div><label>" + esc(pr.nombre) + (pr.u > 1 ? " (" + pr.u + ")" : "") + "</label>" +
+          '<input inputmode="numeric" data-pres="' + esc(pr.nombre) + '" placeholder="0"></div>';
+      }).join("");
+    }
+    $("zona-motivo").hidden = tipoMov !== "salida";
+    $("motivos").innerHTML = L.MOTIVOS_SALIDA.map(function (m) {
+      return '<button data-motivo="' + esc(m) + '"' + (m === motivoMov ? ' class="activo"' : "") + ">" + esc(m) + "</button>";
+    }).join("");
+    $("guardar-siguiente").hidden = tipoMov !== "conteo";
+
+    var unidades = L.unidadesDeCasillas(p, casillasMov());
+    var previa = "";
+    if (tipoMov === "conteo") {
+      var dif = unidades - actual;
+      previa = inv[p.cod] && dif !== 0
+        ? '<div class="aviso ' + (dif < 0 ? "mal" : "ok") + '">' + (dif < 0 ? "Faltan " : "Sobran ") +
+          esc(L.textoConteo(p, Math.abs(dif))) + " frente a lo que decía el celular</div>"
+        : '<div class="aviso ok">Quedará en ' + esc(L.textoConteo(p, unidades)) + "</div>";
+    } else if (unidades) {
+      previa = '<div class="aviso ok">Total: ' + esc(L.textoConteo(p, unidades)) + "</div>";
+    }
+    $("vista-previa-mov").innerHTML = previa;
+  }
+
+  function guardarMovimiento() {
+    var p = productoMov();
+    var unidades = L.unidadesDeCasillas(p, casillasMov());
+    // Un conteo en cero es valido (se acabo); una entrada o salida de cero no.
+    if (!unidades && tipoMov !== "conteo") { aviso("Escriba la cantidad"); return false; }
+    var id = datos.movimientos.reduce(function (m, x) { return Math.max(m, x.id); }, 0) + 1;
+    var mov = { id: id, sec: L.siguienteSec(datos), fecha: ahoraTexto(), cod: p.cod, tipo: tipoMov,
+                unidades: unidades, anulado: false };
+    if (tipoMov === "salida") mov.motivo = motivoMov;
+    datos.movimientos.push(mov);
+    if (!guardar()) { datos.movimientos.pop(); datos.siguienteSec--; alert("No se pudo guardar."); return false; }
+    aviso(TIPOS_MOV[tipoMov] + " guardado: " + p.nombre);
+    pintarInventario();
+    pintarProductos();
+    return true;
+  }
+
+  document.querySelectorAll("[data-nuevo]").forEach(function (b) {
+    b.addEventListener("click", function () { abrirMovimiento(b.dataset.nuevo); });
+  });
+  $("lista-inv").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-cod]");
+    if (b) abrirMovimiento(null, b.dataset.cod);
+  });
+  $("cerrar-mov").addEventListener("click", function () { $("hoja-mov").hidden = true; });
+  $("hoja-mov").addEventListener("click", function (e) {
+    if (e.target === $("hoja-mov")) $("hoja-mov").hidden = true;
+  });
+  $("tipos-mov").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) { tipoMov = b.dataset.tipo; pintarMovimiento(false); }
+  });
+  $("motivos").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) { motivoMov = b.dataset.motivo; pintarMovimiento(false); }
+  });
+  $("producto-mov").addEventListener("change", function () { pintarMovimiento(true); });
+  $("casillas-mov").addEventListener("input", function () { pintarMovimiento(false); });
+  $("guardar-mov").addEventListener("click", function () {
+    if (guardarMovimiento()) $("hoja-mov").hidden = true;
+  });
+  // Para contar toda la tienda de corrido: guarda y pasa al producto que sigue.
+  $("guardar-siguiente").addEventListener("click", function () {
+    if (!guardarMovimiento()) return;
+    var sel = $("producto-mov");
+    if (sel.selectedIndex < sel.options.length - 1) {
+      sel.selectedIndex++;
+      pintarMovimiento(true);
+    } else {
+      $("hoja-mov").hidden = true;
+      aviso("Conteo terminado");
+    }
+  });
+
+  $("movs-dia").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-anular-mov]");
+    if (!b || !confirm("¿Anular este movimiento? El inventario se recalcula sin él.")) return;
+    datos.movimientos.forEach(function (m) { if (m.id === +b.dataset.anularMov) m.anulado = true; });
+    guardar();
+    pintarInventario();
+    pintarProductos();
+  });
+
+  $("fecha-inv").addEventListener("change", pintarInventario);
+
+  $("compartir-inv").addEventListener("click", function () {
+    var fecha = $("fecha-inv").value || hoy();
+    var texto = L.textoInventario(CATALOGO.productos, L.inventarioDia(datos, fecha), fecha);
+    if (!texto) { aviso("No hay inventario registrado todavía"); return; }
+    compartir(texto);
+  });
+
+  // ---------------------------------------------------------------- cierre
+  function resumenActual() {
+    var fecha = $("fecha-cierre").value || hoy();
+    return L.resumenDia(datos.ventas, datos.gastos, fecha, datos.bases[fecha] || 0);
+  }
+
+  function contado() {
+    var t = $("contado").value.trim();
+    return t === "" ? null : numero(t);
+  }
+
+  function pintarCierre() {
+    var fecha = $("fecha-cierre").value || hoy();
+    var base = datos.bases[fecha] || 0;
+    if (document.activeElement !== $("base")) $("base").value = base ? base : "";
+    var r = resumenActual();
+    var t = function (titulo, valor, clase) {
+      return '<div class="tarjeta ' + (clase || "") + '"><small>' + titulo + "</small><b>" + valor + "</b></div>";
+    };
+    $("resumen").innerHTML = '<div class="tarjetas">' +
+      t("Ventas", r.num) + t("Total vendido", L.pesos(r.totalVendido)) +
+      L.MEDIOS_PAGO.map(function (m) { return t(m, L.pesos(r.porMedio[m])); }).join("") +
+      t("Gastos", L.pesos(r.totalGastos)) +
+      t("Efectivo que debe haber en el cajón", L.pesos(r.efectivoEsperado), "ancha destacada") + "</div>";
+
+    var c = contado();
+    if (c === null) {
+      $("diferencia").innerHTML = "";
+    } else {
+      var dif = c - r.efectivoEsperado;
+      $("diferencia").innerHTML = dif === 0
+        ? '<div class="aviso ok"><b>Caja cuadrada</b></div>'
+        : '<div class="aviso mal"><b>' + (dif > 0 ? "Sobran " : "Faltan ") + L.pesos(Math.abs(dif)) + "</b></div>";
+    }
+
+    $("por-producto").innerHTML = r.porProducto.length ? "<table>" + r.porProducto.map(function (p) {
+      return "<tr><td>" + esc(p.nombre) + ' <small style="color:var(--suave)">' + esc(p.pres) +
+        '</small></td><td class="n">' + p.cant + '</td><td class="n">' + L.pesos(p.total) + "</td></tr>";
+    }).join("") + "</table>" : '<div class="vacio">Nada vendido este día</div>';
+    pintarAvisoRespaldo();
+  }
+
+  $("fecha-cierre").addEventListener("change", function () { $("contado").value = ""; pintarCierre(); });
+  $("contado").addEventListener("input", pintarCierre);
+  $("base").addEventListener("input", function () {
+    var fecha = $("fecha-cierre").value || hoy();
+    var b = numero($("base").value);
+    if (b) datos.bases[fecha] = b; else delete datos.bases[fecha];
+    guardar();
+    pintarCierre();
+  });
+
+  function descargar(nombre, contenido, tipo) {
+    var blob = new Blob([contenido], { type: tipo });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  function compartir(texto) {
+    if (navigator.share) {
+      navigator.share({ text: texto }).catch(function () {});
+    } else {
+      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
+    }
+  }
+
+  // Al final del dia piden las dos cosas, cuentas e inventario: van en un
+  // solo mensaje para no mandar uno y olvidar el otro.
+  $("compartir").addEventListener("click", function () {
+    var fecha = $("fecha-cierre").value || hoy();
+    var inventario = L.textoInventario(CATALOGO.productos, L.inventarioDia(datos, fecha), fecha);
+    compartir(L.textoCierre(resumenActual(), contado()) + (inventario ? "\n\n" + inventario : ""));
+  });
+
+  // Los datos viven solo en este celular: el respaldo es la unica copia que
+  // hay fuera de el, asi que la app recuerda cuando fue el ultimo.
+  function pintarAvisoRespaldo() {
+    var hay = datos.ventas.length || datos.movimientos.length;
+    var dias = datos.ultimoRespaldo === null ? null
+      : Math.floor((new Date(hoy()) - new Date(datos.ultimoRespaldo)) / 86400000);
+    $("aviso-respaldo").innerHTML = !hay ? ""
+      : dias === null ? '<div class="aviso mal">Todavía no ha descargado ningún respaldo.</div>'
+      : dias > 7 ? '<div class="aviso mal">El último respaldo es de hace ' + dias + " días.</div>"
+      : '<div class="aviso ok">Último respaldo: ' + datos.ultimoRespaldo + "</div>";
+  }
+
+  $("descargar-csv").addEventListener("click", function () {
+    var fecha = $("fecha-cierre").value || hoy();
+    // El BOM al principio es para que Excel lea bien las tildes.
+    descargar("ventas_" + fecha + ".csv", "﻿" + L.csvDia(datos.ventas, fecha), "text/csv;charset=utf-8");
+  });
+
+  $("descargar-respaldo").addEventListener("click", function () {
+    datos.ultimoRespaldo = hoy();
+    guardar();
+    descargar("respaldo_caja_" + hoy() + ".json", JSON.stringify(datos), "application/json");
+    pintarAvisoRespaldo();
+  });
+
+  $("cargar-respaldo").addEventListener("click", function () { $("archivo-respaldo").click(); });
+  $("archivo-respaldo").addEventListener("change", function () {
+    var archivo = this.files[0];
+    this.value = "";
+    if (!archivo) return;
+    var lector = new FileReader();
+    lector.onload = function () {
+      var leido;
+      try { leido = JSON.parse(lector.result); } catch (e) { leido = null; }
+      if (!L.respaldoValido(leido)) { alert("Ese archivo no es un respaldo de esta app."); return; }
+      if (!confirm("Esto reemplaza todo lo que hay en el celular por el respaldo (" +
+                   leido.ventas.length + " ventas). ¿Seguir?")) return;
+      var anterior = datos;
+      datos = L.normalizar(leido);
+      if (!guardar()) { datos = anterior; alert("No se pudo guardar el respaldo."); return; }
+      pintarCierre();
+      pintarProductos();
+      aviso("Respaldo restaurado");
+    };
+    lector.readAsText(archivo);
+  });
+
+  // ---------------------------------------------------------------- vistas
+  var vistas = ["vender", "dia", "inventario", "cierre"];
+  document.querySelector("nav").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    vistas.forEach(function (v) { $("vista-" + v).hidden = v !== b.dataset.vista; });
+    document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("activo", x === b); });
+    $("barra-carrito").style.display = b.dataset.vista === "vender" ? "" : "none";
+    if (b.dataset.vista === "dia") pintarDia();
+    if (b.dataset.vista === "inventario") pintarInventario();
+    if (b.dataset.vista === "cierre") pintarCierre();
+    window.scrollTo(0, 0);
+  });
+
+  // ---------------------------------------------------------------- inicio
+  cargar();
+  $("fecha-dia").value = hoy();
+  $("fecha-inv").value = hoy();
+  $("fecha-cierre").value = hoy();
+  $("subtitulo").textContent = CATALOGO.tienda;
+  $("info-catalogo").textContent = "Precios cargados el " + CATALOGO.generado + " (" + CATALOGO.tienda + ").";
+  pintarCategorias();
+  pintarProductos();
+  pintarBarra();
+
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js");
+  }
+})();
+</script>
+</body>
+</html>
