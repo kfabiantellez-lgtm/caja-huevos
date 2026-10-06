@@ -72,6 +72,8 @@ label { display: block; font-size: 14px; color: var(--suave); margin: 10px 0 4px
 .presentaciones button { text-align: left; line-height: 1.2; }
 .presentaciones button span { display: block; font-size: 13px; color: var(--suave); }
 .presentaciones button:active { background: var(--marca-suave); }
+.presentaciones button.cambiado span { color: var(--marca); font-weight: 600; }
+.modo-precios .presentaciones button { border-style: dashed; border-color: var(--marca); }
 
 .barra-carrito {
   position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 6;
@@ -152,6 +154,13 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
 <main>
   <!-- VENDER -->
   <section id="vista-vender">
+    <div class="fila-botones" style="margin:0 0 8px">
+      <button id="modo-precios">Cambiar precios</button>
+    </div>
+    <div id="aviso-precios" class="aviso ok" hidden>
+      Toque una presentación para cambiar su precio. Los precios en naranja
+      son los que se cambiaron en este celular.
+    </div>
     <div class="chips" id="categorias"></div>
     <div id="productos"></div>
   </section>
@@ -380,11 +389,48 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
       return '<div class="producto"><b>' + esc(p.nombre) + stock + '</b><div class="presentaciones">' +
         p.pres.map(function (pr, i) {
           if (!pr.venta) return "";
-          return '<button data-cod="' + esc(p.cod) + '" data-i="' + i + '">' + esc(pr.nombre) +
-            "<span>" + L.pesos(pr.precio) + "</span></button>";
+          var cambiado = L.precioCambiado(datos.precios, p, pr);
+          return '<button data-cod="' + esc(p.cod) + '" data-i="' + i + '"' + (cambiado ? ' class="cambiado"' : "") +
+            ">" + esc(pr.nombre) + "<span>" + L.pesos(L.precioDe(datos.precios, p, pr)) + "</span></button>";
         }).join("") + "</div></div>";
     }).join("");
   }
+
+  function pintarInfoCatalogo() {
+    var n = Object.keys(datos.precios).length;
+    $("info-catalogo").textContent = "Precios cargados el " + CATALOGO.generado + " (" + CATALOGO.tienda + ")" +
+      (n ? "; " + n + (n === 1 ? " cambiado" : " cambiados") + " en este celular." : ".");
+  }
+
+  var modoPrecios = false;
+
+  function pintarModoPrecios() {
+    $("modo-precios").textContent = modoPrecios ? "Listo, volver a vender" : "Cambiar precios";
+    $("modo-precios").className = modoPrecios ? "primario" : "";
+    $("aviso-precios").hidden = !modoPrecios;
+    $("vista-vender").classList.toggle("modo-precios", modoPrecios);
+  }
+
+  function editarPrecio(p, pr) {
+    var actual = L.precioDe(datos.precios, p, pr);
+    var r = prompt("Nuevo precio de " + p.nombre + " (" + pr.nombre + ")\n" +
+                   "Ahora: " + L.pesos(actual) + " · Original: " + L.pesos(pr.precio) + "\n" +
+                   "Déjelo vacío para volver al original.", actual);
+    if (r === null) return;
+    var nuevo = r.trim() === "" ? null : numero(r);
+    if (nuevo === 0) { aviso("El precio no puede ser cero"); return; }
+    var antes = JSON.parse(JSON.stringify(datos.precios));
+    L.cambiarPrecio(datos.precios, p, pr, nuevo);
+    if (!guardar()) { datos.precios = antes; alert("No se pudo guardar el precio."); return; }
+    pintarProductos();
+    pintarInfoCatalogo();
+    aviso(p.nombre + " (" + pr.nombre + "): " + L.pesos(L.precioDe(datos.precios, p, pr)));
+  }
+
+  $("modo-precios").addEventListener("click", function () {
+    modoPrecios = !modoPrecios;
+    pintarModoPrecios();
+  });
 
   function buscarProducto(cod) {
     for (var i = 0; i < CATALOGO.productos.length; i++) {
@@ -488,7 +534,9 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     if (!b) return;
     var p = buscarProducto(b.dataset.cod);
     var pr = p.pres[+b.dataset.i];
-    L.agregarAlCarrito(carrito, { cod: p.cod, nombre: p.nombre, pres: pr.nombre, u: pr.u, cant: 1, precio: pr.precio });
+    if (modoPrecios) { editarPrecio(p, pr); return; }
+    L.agregarAlCarrito(carrito, { cod: p.cod, nombre: p.nombre, pres: pr.nombre, u: pr.u, cant: 1,
+                                  precio: L.precioDe(datos.precios, p, pr) });
     pintarBarra();
     if (navigator.vibrate) navigator.vibrate(15);
   });
@@ -902,6 +950,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
       if (!guardar()) { datos = anterior; alert("No se pudo guardar el respaldo."); return; }
       pintarCierre();
       pintarProductos();
+      pintarInfoCatalogo();
       aviso("Respaldo restaurado");
     };
     lector.readAsText(archivo);
@@ -927,7 +976,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   $("fecha-inv").value = hoy();
   $("fecha-cierre").value = hoy();
   $("subtitulo").textContent = CATALOGO.tienda;
-  $("info-catalogo").textContent = "Precios cargados el " + CATALOGO.generado + " (" + CATALOGO.tienda + ").";
+  pintarInfoCatalogo();
   pintarCategorias();
   pintarProductos();
   pintarBarra();

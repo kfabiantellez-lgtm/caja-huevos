@@ -168,7 +168,8 @@
       Array.isArray(obj.ventas) && Array.isArray(obj.gastos) &&
       typeof obj.bases === "object" && obj.bases !== null &&
       typeof obj.siguienteNum === "number" &&
-      (obj.movimientos === undefined || Array.isArray(obj.movimientos));
+      (obj.movimientos === undefined || Array.isArray(obj.movimientos)) &&
+      (obj.precios === undefined || (typeof obj.precios === "object" && obj.precios !== null));
   }
 
   // Lo que se agrego despues (el inventario) puede faltar en datos guardados
@@ -176,8 +177,43 @@
   function normalizar(obj) {
     if (!obj.movimientos) obj.movimientos = [];
     if (typeof obj.siguienteSec !== "number") obj.siguienteSec = 1;
+    if (!obj.precios) obj.precios = {};
     if (obj.ultimoRespaldo === undefined) obj.ultimoRespaldo = null;
     return obj;
+  }
+
+  // ===================================================================
+  // PRECIOS CAMBIADOS EN EL CELULAR
+  //
+  // En la tienda cambian los precios de una semana a otra, y alla no hay
+  // computador para volver a generar catalogo.js. Por eso el celular guarda
+  // sus propios precios ENCIMA del catalogo: solo los que se cambiaron, con
+  // la llave "codigo|presentacion". El catalogo queda como el precio
+  // "original", y volver a el es borrar la llave.
+  //
+  // El precio cambiado manda siempre, aunque despues se publique un catalogo
+  // nuevo: lo ultimo que se decidio en la tienda es lo que se cobra.
+  // ===================================================================
+
+  function llavePrecio(producto, pres) {
+    return producto.cod + "|" + pres.nombre;
+  }
+
+  function precioDe(precios, producto, pres) {
+    var k = llavePrecio(producto, pres);
+    return Object.prototype.hasOwnProperty.call(precios, k) ? precios[k] : pres.precio;
+  }
+
+  // nuevo = null, o igual al del catalogo, vuelve al precio original.
+  function cambiarPrecio(precios, producto, pres, nuevo) {
+    var k = llavePrecio(producto, pres);
+    if (nuevo === null || nuevo === pres.precio) delete precios[k];
+    else precios[k] = nuevo;
+    return precios;
+  }
+
+  function precioCambiado(precios, producto, pres) {
+    return Object.prototype.hasOwnProperty.call(precios, llavePrecio(producto, pres));
   }
 
   // ===================================================================
@@ -322,6 +358,7 @@
     agregarAlCarrito: agregarAlCarrito, totalCarrito: totalCarrito, cambio: cambio,
     resumenDia: resumenDia, textoCierre: textoCierre, csvDia: csvDia,
     respaldoValido: respaldoValido, normalizar: normalizar, siguienteSec: siguienteSec,
+    precioDe: precioDe, cambiarPrecio: cambiarPrecio, precioCambiado: precioCambiado,
     MOTIVOS_SALIDA: MOTIVOS_SALIDA, presVenta: presVenta, presCantidad: presCantidad,
     textoConteo: textoConteo, unidadesDeCasillas: unidadesDeCasillas,
     inventarioDia: inventarioDia, textoInventario: textoInventario
