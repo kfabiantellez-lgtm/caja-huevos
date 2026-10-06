@@ -169,7 +169,8 @@
       typeof obj.bases === "object" && obj.bases !== null &&
       typeof obj.siguienteNum === "number" &&
       (obj.movimientos === undefined || Array.isArray(obj.movimientos)) &&
-      (obj.precios === undefined || (typeof obj.precios === "object" && obj.precios !== null));
+      (obj.precios === undefined || (typeof obj.precios === "object" && obj.precios !== null)) &&
+      (obj.productos === undefined || Array.isArray(obj.productos));
   }
 
   // Lo que se agrego despues (el inventario) puede faltar en datos guardados
@@ -178,6 +179,7 @@
     if (!obj.movimientos) obj.movimientos = [];
     if (typeof obj.siguienteSec !== "number") obj.siguienteSec = 1;
     if (!obj.precios) obj.precios = {};
+    if (!obj.productos) obj.productos = [];
     if (obj.ultimoRespaldo === undefined) obj.ultimoRespaldo = null;
     return obj;
   }
@@ -214,6 +216,75 @@
 
   function precioCambiado(precios, producto, pres) {
     return Object.prototype.hasOwnProperty.call(precios, llavePrecio(producto, pres));
+  }
+
+  // ===================================================================
+  // PRODUCTOS CREADOS EN EL CELULAR
+  //
+  // A la tienda llegan productos nuevos para probar, y alla no hay computador.
+  // Igual que los precios, se guardan en el celular (datos.productos) y se
+  // suman al catalogo al leerlo. Sus ventas e inventario funcionan igual que
+  // los del catalogo, porque todo va por el codigo.
+  //
+  // - El codigo es "CEL1", "CEL2"...: un prefijo que el catalogo no usa, para
+  //   que un producto del celular nunca se confunda con uno de la base.
+  // - No se borran, se OCULTAN: un producto con ventas guardadas tiene que
+  //   seguir existiendo para que el historial y el inventario se lean bien.
+  // - Se cuenta en su presentacion mas pequena (normalmente la unidad): un
+  //   producto de prueba se cuenta suelto.
+  // ===================================================================
+
+  function unirProductos(catalogo, propios) {
+    var cats = [];
+    catalogo.concat(propios).forEach(function (p) { if (cats.indexOf(p.cat) < 0) cats.push(p.cat); });
+    var propiosOrdenados = propios.slice().sort(function (a, b) { return a.nombre < b.nombre ? -1 : 1; });
+    var todos = [];
+    cats.forEach(function (c) {
+      catalogo.forEach(function (p) { if (p.cat === c) todos.push(p); });
+      propiosOrdenados.forEach(function (p) { if (p.cat === c) todos.push(p); });
+    });
+    return todos;
+  }
+
+  function normalizarTexto(t) {
+    return String(t || "").trim().replace(/\s+/g, " ");
+  }
+
+  // nuevo = { nombre, cat, pres: [{nombre, u, precio}] }. Devuelve el
+  // problema en palabras, o null si esta bien.
+  function validarProducto(todos, nuevo) {
+    var nombre = normalizarTexto(nuevo.nombre).toUpperCase();
+    if (!nombre) return "Escriba el nombre del producto.";
+    if (!normalizarTexto(nuevo.cat)) return "Escoja o escriba la categoría.";
+    for (var i = 0; i < todos.length; i++) {
+      if (todos[i].nombre.toUpperCase() === nombre) return "Ya existe un producto llamado " + nombre + ".";
+    }
+    if (!nuevo.pres.length) return "Agregue al menos una presentación.";
+    var vistos = {};
+    for (var j = 0; j < nuevo.pres.length; j++) {
+      var pr = nuevo.pres[j];
+      var n = normalizarTexto(pr.nombre);
+      if (!n) return "A una presentación le falta el nombre.";
+      if (vistos[n.toLowerCase()]) return "La presentación " + n + " está repetida.";
+      vistos[n.toLowerCase()] = true;
+      if (!(pr.u >= 1) || Math.floor(pr.u) !== pr.u) return "Las unidades de " + n + " deben ser un número entero (1 o más).";
+      if (!(pr.precio > 0)) return "Falta el precio de " + n + ".";
+    }
+    return null;
+  }
+
+  function crearProducto(datos, nuevo) {
+    var mayor = 0;
+    datos.productos.forEach(function (p) { mayor = Math.max(mayor, parseInt(p.cod.slice(3), 10) || 0); });
+    var pres = nuevo.pres.map(function (pr) {
+      return { nombre: normalizarTexto(pr.nombre), u: pr.u, precio: pr.precio, venta: true, conteo: false };
+    }).sort(function (a, b) { return a.u - b.u; });
+    pres[0].conteo = true;
+    var producto = { cod: "CEL" + (mayor + 1), cat: normalizarTexto(nuevo.cat).toUpperCase(),
+                     nombre: normalizarTexto(nuevo.nombre).toUpperCase(), pres: pres,
+                     propio: true, oculto: false };
+    datos.productos.push(producto);
+    return producto;
   }
 
   // ===================================================================
@@ -359,6 +430,7 @@
     resumenDia: resumenDia, textoCierre: textoCierre, csvDia: csvDia,
     respaldoValido: respaldoValido, normalizar: normalizar, siguienteSec: siguienteSec,
     precioDe: precioDe, cambiarPrecio: cambiarPrecio, precioCambiado: precioCambiado,
+    unirProductos: unirProductos, validarProducto: validarProducto, crearProducto: crearProducto,
     MOTIVOS_SALIDA: MOTIVOS_SALIDA, presVenta: presVenta, presCantidad: presCantidad,
     textoConteo: textoConteo, unidadesDeCasillas: unidadesDeCasillas,
     inventarioDia: inventarioDia, textoInventario: textoInventario
