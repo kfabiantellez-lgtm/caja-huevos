@@ -68,7 +68,10 @@ label { display: block; font-size: 14px; color: var(--suave); margin: 10px 0 4px
 .casillas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .casillas label { margin: 0 0 2px; }
 .motivos { grid-template-columns: 1fr 1fr; margin-top: 4px; }
-.fila-pres { display: grid; grid-template-columns: 2fr 1fr 1.3fr; gap: 6px; margin-bottom: 6px; }
+.fila-pres { display: grid; grid-template-columns: 2fr 1fr 1.3fr 44px; gap: 6px; margin-bottom: 6px; }
+.fila-pres button { padding: 0; }
+.producto .editar { display: none; float: right; min-height: 32px; padding: 4px 12px; font-size: 14px; }
+.modo-precios .producto .editar { display: inline-block; }
 .presentaciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
 .presentaciones button { text-align: left; line-height: 1.2; }
 .presentaciones button span { display: block; font-size: 13px; color: var(--suave); }
@@ -160,8 +163,9 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
       <button id="nuevo-producto">Producto nuevo</button>
     </div>
     <div id="aviso-precios" class="aviso ok" hidden>
-      Toque una presentación para cambiar su precio. Los precios en naranja
-      son los que se cambiaron en este celular.
+      Toque una presentación para cambiar su precio, o «Editar» para cambiar
+      las presentaciones del producto. Los precios en naranja son los que se
+      cambiaron en este celular.
     </div>
     <div class="chips" id="categorias"></div>
     <div id="productos"></div>
@@ -245,24 +249,37 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
 <div class="hoja" id="hoja-producto" hidden>
   <div>
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <h2 style="margin:0">Producto nuevo</h2>
+      <h2 style="margin:0" id="np-titulo">Producto nuevo</h2>
       <button id="cerrar-producto">Cerrar</button>
     </div>
-    <label for="np-nombre">Nombre</label>
-    <input id="np-nombre" placeholder="Ej. Arequipe 250 g">
-    <label for="np-cat">Categoría</label>
-    <select id="np-cat"></select>
-    <input id="np-cat-nueva" placeholder="Nombre de la categoría nueva" hidden style="margin-top:8px">
+    <div id="np-datos">
+      <label for="np-nombre">Nombre</label>
+      <input id="np-nombre" placeholder="Ej. Arequipe 250 g">
+      <label for="np-cat">Categoría</label>
+      <select id="np-cat"></select>
+      <input id="np-cat-nueva" placeholder="Nombre de la categoría nueva" hidden style="margin-top:8px">
+    </div>
     <label>Presentaciones</label>
     <p style="color:var(--suave);font-size:13px;margin:0 0 6px">
       Nombre · unidades sueltas que trae · precio. Una unidad = 1; un paquete de 12 = 12.
+      Sin precio no se vende: solo sirve para escribir cantidades.
     </p>
     <div id="np-pres"></div>
     <div class="fila-botones" style="margin-top:8px"><button id="np-otra">+ Otra presentación</button></div>
+    <label for="np-modo">¿Cómo se cuenta el inventario?</label>
+    <select id="np-modo">
+      <option value="aparte">Cada presentación aparte (bolsas, paquetes)</option>
+      <option value="suelto">Suelto, en la unidad más pequeña (como los huevos)</option>
+    </select>
     <div id="np-error"></div>
     <div class="fila-botones"><button class="primario" id="np-guardar">Guardar producto</button></div>
-    <h2>Creados en este celular</h2>
-    <div id="np-lista"></div>
+    <div class="fila-botones" id="np-zona-restaurar">
+      <button class="peligro" id="np-restaurar">Volver a como viene del computador</button>
+    </div>
+    <div id="np-propios">
+      <h2>Creados en este celular</h2>
+      <div id="np-lista"></div>
+    </div>
   </div>
 </div>
 
@@ -388,14 +405,15 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   }
 
   // ---------------------------------------------------------------- vender
-  // Los del catalogo mas los creados en este celular. Se recalcula al cargar
-  // los datos y cada vez que se crea u oculta un producto.
+  // Los del catalogo (con sus cambios hechos aqui) mas los creados en este
+  // celular. Se recalcula al cargar los datos y cada vez que se crea, edita
+  // u oculta un producto.
   var productos = [];
   var categorias = [];
   var categoriaActiva = null;
 
   function recalcularProductos() {
-    productos = L.unirProductos(CATALOGO.productos, datos.productos);
+    productos = L.unirProductos(CATALOGO.productos, datos.productos, datos.cambiosCatalogo);
     categorias = [];
     productos.forEach(function (p) {
       if (!p.oculto && categorias.indexOf(p.cat) < 0) categorias.push(p.cat);
@@ -424,16 +442,17 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   }
 
   function pintarProductos() {
-    var inv = L.inventarioDia(datos, hoy());
+    var inv = L.inventarioDia(datos, hoy(), productos);
     $("productos").innerHTML = visibles().filter(function (p) {
       return p.cat === categoriaActiva && L.presVenta(p).length;
     }).map(function (p) {
       // El stock solo se muestra si ya se conto o se movio algo: un "0" en
       // un producto que nunca se ha contado haria creer que no hay.
       var r = inv[p.cod];
-      var stock = r ? "<small" + (r.final < 0 ? ' class="negativo"' : "") + ">quedan " +
-        esc(L.textoConteo(p, r.final)) + "</small>" : "";
-      return '<div class="producto"><b>' + esc(p.nombre) + stock + '</b><div class="presentaciones">' +
+      var stock = r ? "<small" + (L.stockNegativo(r) ? ' class="negativo"' : "") + ">quedan " +
+        esc(L.textoStock(p, r)) + "</small>" : "";
+      return '<div class="producto"><button class="editar" data-editar="' + esc(p.cod) + '">Editar</button>' +
+        "<b>" + esc(p.nombre) + stock + '</b><div class="presentaciones">' +
         p.pres.map(function (pr, i) {
           if (!pr.venta) return "";
           var cambiado = L.precioCambiado(datos.precios, p, pr);
@@ -446,8 +465,10 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   function pintarInfoCatalogo() {
     var n = Object.keys(datos.precios).length;
     var np = datos.productos.length;
+    var nc = Object.keys(datos.cambiosCatalogo).length;
     $("info-catalogo").textContent = "Precios cargados el " + CATALOGO.generado + " (" + CATALOGO.tienda + ")" +
       (n ? "; " + n + (n === 1 ? " precio cambiado" : " precios cambiados") + " en este celular" : "") +
+      (nc ? "; " + nc + (nc === 1 ? " producto con presentaciones cambiadas" : " productos con presentaciones cambiadas") : "") +
       (np ? "; " + np + (np === 1 ? " producto creado" : " productos creados") + " aquí" : "") + ".";
   }
 
@@ -488,14 +509,47 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     return null;
   }
 
-  // ---------------------------------------------------------------- producto nuevo
-  function filaPresentacion(nombre, u) {
-    return '<div class="fila-pres"><input data-campo="nombre" placeholder="Ej. Unidad" value="' + esc(nombre) + '">' +
-      '<input data-campo="u" inputmode="numeric" placeholder="1" value="' + esc(u) + '">' +
-      '<input data-campo="precio" inputmode="numeric" placeholder="$"></div>';
+  // ---------------------------------------------------------------- producto nuevo o editado
+  // La misma hoja sirve para crear y para editar. editando: el producto que
+  // se esta editando, o null si se esta creando uno.
+  var editando = null;
+
+  // pr.id: la fila viene de una presentacion que ya existia y conserva su
+  // llave de inventario aunque se le cambie el nombre.
+  function filaPresentacion(pr) {
+    return '<div class="fila-pres"' + (pr.id ? ' data-id="' + esc(pr.id) + '"' : "") + ">" +
+      '<input data-campo="nombre" placeholder="Ej. Unidad" value="' + esc(pr.nombre || "") + '">' +
+      '<input data-campo="u" inputmode="numeric" placeholder="1" value="' + esc(pr.u || "") + '">' +
+      '<input data-campo="precio" inputmode="numeric" placeholder="$" value="' + esc(pr.precio || "") + '">' +
+      '<button data-quitar aria-label="Quitar presentación">×</button></div>';
+  }
+
+  function prepararHoja(titulo, boton) {
+    $("np-titulo").textContent = titulo;
+    $("np-guardar").textContent = boton;
+    $("np-error").innerHTML = "";
+    $("hoja-producto").hidden = false;
+  }
+
+  function abrirEditar(cod) {
+    var p = buscarProducto(cod);
+    editando = p;
+    $("np-datos").hidden = true;
+    $("np-propios").hidden = true;
+    $("np-zona-restaurar").hidden = !p.cambiado;
+    $("np-pres").innerHTML = p.pres.map(function (pr) {
+      return filaPresentacion({ id: L.idPres(pr), nombre: pr.nombre, u: pr.u,
+                                precio: pr.venta ? L.precioDe(datos.precios, p, pr) : "" });
+    }).join("");
+    $("np-modo").value = L.porPresentacion(p) ? "aparte" : "suelto";
+    prepararHoja(p.nombre, "Guardar cambios");
   }
 
   function abrirProductoNuevo() {
+    editando = null;
+    $("np-datos").hidden = false;
+    $("np-propios").hidden = false;
+    $("np-zona-restaurar").hidden = true;
     $("np-nombre").value = "";
     $("np-cat").innerHTML = categorias.map(function (c) {
       return '<option value="' + esc(c) + '">' + esc(c.charAt(0) + c.slice(1).toLowerCase()) + "</option>";
@@ -503,10 +557,10 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     $("np-cat").value = categoriaActiva;
     $("np-cat-nueva").hidden = true;
     $("np-cat-nueva").value = "";
-    $("np-pres").innerHTML = filaPresentacion("Unidad", "1");
-    $("np-error").innerHTML = "";
+    $("np-pres").innerHTML = filaPresentacion({ nombre: "Unidad", u: 1 });
+    $("np-modo").value = "aparte";
     pintarPropios();
-    $("hoja-producto").hidden = false;
+    prepararHoja("Producto nuevo", "Guardar producto");
   }
 
   function pintarPropios() {
@@ -517,44 +571,92 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     }).join("") : '<div class="vacio">Todavía no ha creado ninguno</div>';
   }
 
-  function leerProductoNuevo() {
+  function leerPresentaciones() {
     var pres = [];
     document.querySelectorAll("#np-pres .fila-pres").forEach(function (fila) {
       var campo = function (n) { return fila.querySelector('[data-campo="' + n + '"]').value.trim(); };
       // Una fila agregada y dejada en blanco no es un error: se ignora.
       if (!campo("nombre") && !campo("u") && !campo("precio")) return;
-      pres.push({ nombre: campo("nombre"), u: numero(campo("u")), precio: numero(campo("precio")) });
+      pres.push({ id: fila.dataset.id, nombre: campo("nombre"), u: numero(campo("u")), precio: numero(campo("precio")) });
     });
+    return pres;
+  }
+
+  function leerProductoNuevo() {
     return {
       nombre: $("np-nombre").value,
       cat: $("np-cat").value || $("np-cat-nueva").value,
-      pres: pres
+      pres: leerPresentaciones(),
+      porPres: $("np-modo").value === "aparte"
     };
   }
 
+  function mostrarErrorProducto(error) {
+    $("np-error").innerHTML = '<div class="aviso mal">' + esc(error) + "</div>";
+  }
+
+  function despuesDeCambiarProducto(texto) {
+    recalcularProductos();
+    pintarCategorias();
+    pintarProductos();
+    pintarInfoCatalogo();
+    $("hoja-producto").hidden = true;
+    aviso(texto);
+  }
+
+  // Lo que toca editar un producto, para devolverlo si no se pudo guardar.
+  function copiaProductos() {
+    return JSON.stringify([datos.productos, datos.cambiosCatalogo, datos.precios]);
+  }
+
+  function devolverProductos(copia) {
+    var c = JSON.parse(copia);
+    datos.productos = c[0];
+    datos.cambiosCatalogo = c[1];
+    datos.precios = c[2];
+  }
+
+  function guardarEdicion() {
+    var pres = leerPresentaciones();
+    var error = L.validarPresentaciones(pres);
+    if (error) { mostrarErrorProducto(error); return; }
+    var copia = copiaProductos();
+    L.editarPresentaciones(datos, editando, { pres: pres, porPres: $("np-modo").value === "aparte" });
+    if (!guardar()) { devolverProductos(copia); alert("No se pudieron guardar los cambios."); return; }
+    despuesDeCambiarProducto(editando.nombre + ": presentaciones guardadas");
+  }
+
   $("nuevo-producto").addEventListener("click", abrirProductoNuevo);
+  $("np-pres").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-quitar]");
+    if (b) b.parentNode.remove();
+  });
+  $("np-restaurar").addEventListener("click", function () {
+    if (!confirm("¿Volver " + editando.nombre + " a como viene del computador? Se pierden las " +
+                 "presentaciones y los precios que se le cambiaron en este celular.")) return;
+    var copia = copiaProductos();
+    delete datos.cambiosCatalogo[editando.cod];
+    if (!guardar()) { devolverProductos(copia); alert("No se pudo guardar."); return; }
+    despuesDeCambiarProducto(editando.nombre + " quedó como viene del computador");
+  });
   $("cerrar-producto").addEventListener("click", function () { $("hoja-producto").hidden = true; });
   $("np-cat").addEventListener("change", function () {
     $("np-cat-nueva").hidden = $("np-cat").value !== "";
     if (!$("np-cat-nueva").hidden) $("np-cat-nueva").focus();
   });
   $("np-otra").addEventListener("click", function () {
-    $("np-pres").insertAdjacentHTML("beforeend", filaPresentacion("", ""));
+    $("np-pres").insertAdjacentHTML("beforeend", filaPresentacion({}));
   });
 
   $("np-guardar").addEventListener("click", function () {
+    if (editando) { guardarEdicion(); return; }
     var nuevo = leerProductoNuevo();
     var error = L.validarProducto(productos, nuevo);
-    if (error) { $("np-error").innerHTML = '<div class="aviso mal">' + esc(error) + "</div>"; return; }
+    if (error) { mostrarErrorProducto(error); return; }
     var producto = L.crearProducto(datos, nuevo);
     if (!guardar()) { datos.productos.pop(); alert("No se pudo guardar el producto."); return; }
-    recalcularProductos();
     categoriaActiva = producto.cat;
-    pintarCategorias();
-    pintarProductos();
-    pintarInfoCatalogo();
-    $("hoja-producto").hidden = true;
-    aviso(producto.nombre + " creado. Ya se puede vender y contar.");
+    despuesDeCambiarProducto(producto.nombre + " creado. Ya se puede vender y contar.");
   });
 
   $("np-lista").addEventListener("click", function (e) {
@@ -662,11 +764,12 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   $("productos").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
+    if (b.dataset.editar) { abrirEditar(b.dataset.editar); return; }
     var p = buscarProducto(b.dataset.cod);
     var pr = p.pres[+b.dataset.i];
     if (modoPrecios) { editarPrecio(p, pr); return; }
-    L.agregarAlCarrito(carrito, { cod: p.cod, nombre: p.nombre, pres: pr.nombre, u: pr.u, cant: 1,
-                                  precio: L.precioDe(datos.precios, p, pr) });
+    L.agregarAlCarrito(carrito, { cod: p.cod, nombre: p.nombre, pres: pr.nombre, pid: L.idPres(pr), u: pr.u,
+                                  cant: 1, precio: L.precioDe(datos.precios, p, pr) });
     pintarBarra();
     if (navigator.vibrate) navigator.vibrate(15);
   });
@@ -794,7 +897,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
 
   function pintarInventario() {
     var fecha = $("fecha-inv").value || hoy();
-    var inv = L.inventarioDia(datos, fecha);
+    var inv = L.inventarioDia(datos, fecha, productos);
     var html = "";
     var catActual = null;
     visibles().forEach(function (p) {
@@ -803,16 +906,10 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
         html += "<h2>" + esc(p.cat.charAt(0) + p.cat.slice(1).toLowerCase()) + "</h2>";
       }
       var r = inv[p.cod];
-      var t = function (n) { return L.textoConteo(p, n); };
-      var detalle = [];
-      if (r && r.vendido) detalle.push("vendido " + t(r.vendido));
-      if (r && r.entro) detalle.push("entró " + t(r.entro));
-      if (r && r.salio) detalle.push("salió " + t(r.salio));
-      if (r && r.ajuste) detalle.push("ajuste " + (r.ajuste > 0 ? "+" : "") + t(r.ajuste));
       html += '<button class="fila-inv" data-cod="' + esc(p.cod) + '"><span class="que">' + esc(p.nombre) +
-        "<small>" + (r ? (detalle.join(" · ") || "sin movimiento ese día") : "sin contar todavía") +
-        "</small></span><b" + (r && r.final < 0 ? ' class="negativo"' : "") + ">" +
-        (r ? esc(t(r.final)) : "—") + "</b></button>";
+        "<small>" + (r ? (L.detalleDia(p, r).join(" · ") || "sin movimiento ese día") : "sin contar todavía") +
+        "</small></span><b" + (r && L.stockNegativo(r) ? ' class="negativo"' : "") + ">" +
+        (r ? esc(L.textoStock(p, r)) : "—") + "</b></button>";
     });
     $("lista-inv").innerHTML = html;
 
@@ -820,7 +917,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     $("movs-dia").innerHTML = movs.length ? movs.map(function (m) {
       var p = buscarProducto(m.cod);
       var que = p ? p.nombre : m.cod;
-      var cant = p ? L.textoConteo(p, m.unidades) : m.unidades + " u";
+      var cant = p ? L.textoMovimiento(p, m) : m.unidades + " u";
       return '<div class="venta' + (m.anulado ? " anulada" : "") + '"><div class="cab"><span>' +
         TIPOS_MOV[m.tipo] + " · " + esc(que) + ' <small style="color:var(--suave)">' + m.fecha.slice(11, 16) +
         (m.motivo ? " · " + esc(m.motivo) : "") + '</small></span><b class="monto">' + esc(cant) + "</b></div>" +
@@ -853,19 +950,22 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   // vuelven a armar vacias. Al escribir solo se actualiza la vista previa.
   function pintarMovimiento(limpiar) {
     var p = productoMov();
-    var inv = L.inventarioDia(datos, hoy());
-    var actual = inv[p.cod] ? inv[p.cod].final : 0;
+    var porPres = L.porPresentacion(p);
+    var r = L.inventarioDia(datos, hoy(), productos)[p.cod];
+    var actual = r ? r.final : 0;
     $("tipos-mov").innerHTML = Object.keys(TIPOS_MOV).map(function (t) {
       return '<button data-tipo="' + t + '"' + (t === tipoMov ? ' class="activo"' : "") + ">" + TIPOS_MOV[t] + "</button>";
     }).join("");
-    $("stock-mov").textContent = inv[p.cod]
-      ? "Según el celular hay " + L.textoConteo(p, actual) : "Este producto no se ha contado todavía.";
+    $("stock-mov").textContent = r
+      ? "Según el celular hay " + L.textoStock(p, r) : "Este producto no se ha contado todavía.";
     $("titulo-casillas").textContent = tipoMov === "conteo" ? "¿Cuánto hay de verdad?"
       : tipoMov === "entrada" ? "¿Cuánto llegó?" : "¿Cuánto salió?";
     if (limpiar) {
-      $("casillas-mov").innerHTML = L.presCantidad(p).map(function (pr) {
-        return "<div><label>" + esc(pr.nombre) + (pr.u > 1 ? " (" + pr.u + ")" : "") + "</label>" +
-          '<input inputmode="numeric" data-pres="' + esc(pr.nombre) + '" placeholder="0"></div>';
+      // Contando por presentacion, cuantas unidades trae cada una no importa:
+      // se cuentan bolsas.
+      $("casillas-mov").innerHTML = L.presParaContar(p).map(function (pr) {
+        return "<div><label>" + esc(pr.nombre) + (!porPres && pr.u > 1 ? " (" + pr.u + ")" : "") + "</label>" +
+          '<input inputmode="numeric" data-pres="' + esc(L.idPres(pr)) + '" placeholder="0"></div>';
       }).join("");
     }
     $("zona-motivo").hidden = tipoMov !== "salida";
@@ -874,28 +974,42 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
     }).join("");
     $("guardar-siguiente").hidden = tipoMov !== "conteo";
 
-    var unidades = L.unidadesDeCasillas(p, casillasMov());
+    var casillas = casillasMov();
+    var escrito = { unidades: L.unidadesDeCasillas(p, casillas), detalle: casillas };
     var previa = "";
     if (tipoMov === "conteo") {
-      var dif = unidades - actual;
-      previa = inv[p.cod] && dif !== 0
-        ? '<div class="aviso ' + (dif < 0 ? "mal" : "ok") + '">' + (dif < 0 ? "Faltan " : "Sobran ") +
-          esc(L.textoConteo(p, Math.abs(dif))) + " frente a lo que decía el celular</div>"
-        : '<div class="aviso ok">Quedará en ' + esc(L.textoConteo(p, unidades)) + "</div>";
-    } else if (unidades) {
-      previa = '<div class="aviso ok">Total: ' + esc(L.textoConteo(p, unidades)) + "</div>";
+      var quedara = '<div class="aviso ok">Quedará en ' + esc(L.textoMovimiento(p, escrito)) + "</div>";
+      if (r && porPres) {
+        var cambia = L.diferenciaConteo(r, casillas);
+        previa = Object.keys(cambia).length
+          ? '<div class="aviso mal">Frente a lo que decía el celular: ' + esc(L.textoMapa(p, cambia, true)) + "</div>"
+          : quedara;
+      } else {
+        var dif = escrito.unidades - actual;
+        previa = r && dif !== 0
+          ? '<div class="aviso ' + (dif < 0 ? "mal" : "ok") + '">' + (dif < 0 ? "Faltan " : "Sobran ") +
+            esc(L.textoConteo(p, Math.abs(dif))) + " frente a lo que decía el celular</div>"
+          : quedara;
+      }
+    } else if (escrito.unidades) {
+      previa = '<div class="aviso ok">Total: ' + esc(L.textoMovimiento(p, escrito)) + "</div>";
     }
     $("vista-previa-mov").innerHTML = previa;
   }
 
   function guardarMovimiento() {
     var p = productoMov();
-    var unidades = L.unidadesDeCasillas(p, casillasMov());
+    var casillas = casillasMov();
+    var unidades = L.unidadesDeCasillas(p, casillas);
     // Un conteo en cero es valido (se acabo); una entrada o salida de cero no.
     if (!unidades && tipoMov !== "conteo") { aviso("Escriba la cantidad"); return false; }
+    // El detalle por presentacion se guarda siempre, se cuente como se
+    // cuente, para poder cambiar despues la forma de contar el producto.
+    var detalle = {};
+    Object.keys(casillas).forEach(function (k) { if (casillas[k]) detalle[k] = casillas[k]; });
     var id = datos.movimientos.reduce(function (m, x) { return Math.max(m, x.id); }, 0) + 1;
     var mov = { id: id, sec: L.siguienteSec(datos), fecha: ahoraTexto(), cod: p.cod, tipo: tipoMov,
-                unidades: unidades, anulado: false };
+                unidades: unidades, detalle: detalle, anulado: false };
     if (tipoMov === "salida") mov.motivo = motivoMov;
     datos.movimientos.push(mov);
     if (!guardar()) { datos.movimientos.pop(); datos.siguienteSec--; alert("No se pudo guardar."); return false; }
@@ -955,7 +1069,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
 
   $("compartir-inv").addEventListener("click", function () {
     var fecha = $("fecha-inv").value || hoy();
-    var texto = L.textoInventario(productos, L.inventarioDia(datos, fecha), fecha);
+    var texto = L.textoInventario(productos, L.inventarioDia(datos, fecha, productos), fecha);
     if (!texto) { aviso("No hay inventario registrado todavía"); return; }
     compartir(texto);
   });
@@ -1034,7 +1148,7 @@ td.n { text-align: right; white-space: nowrap; padding-left: 8px; }
   // solo mensaje para no mandar uno y olvidar el otro.
   $("compartir").addEventListener("click", function () {
     var fecha = $("fecha-cierre").value || hoy();
-    var inventario = L.textoInventario(productos, L.inventarioDia(datos, fecha), fecha);
+    var inventario = L.textoInventario(productos, L.inventarioDia(datos, fecha, productos), fecha);
     compartir(L.textoCierre(resumenActual(), contado()) + (inventario ? "\n\n" + inventario : ""));
   });
 
